@@ -437,12 +437,28 @@ def parse_kv_fields(line: str) -> list[tuple[str, str]]:
     """Parse a GTF attribute field into (key, value) pairs.
 
     Splits on double-quote characters so semicolons inside quoted values are
-    handled correctly without a character-by-character scan.
+    handled correctly without a character-by-character scan. Also handles
+    unquoted fields (e.g. ``level 2``) which appear in GENCODE GTFs.
     """
     parts = line.split('"')
-    keys = [p.split()[-1] for p in parts[::2] if p.strip()]
-    values = [v or "NA" for v in parts[1::2]]
-    return list(zip(keys, values))
+    pairs = []
+
+    for i in range(0, len(parts), 2):
+        # Even parts contain separator text between quoted values.
+        # Split on ';' to find any unquoted key-value pairs and the key
+        # for the next quoted value.
+        segments = [s.strip() for s in parts[i].split(";")]
+        for seg in segments[:-1]:
+            words = seg.split()
+            if len(words) == 2:  # unquoted pair: key value
+                pairs.append((words[0], words[1]))
+        # Last segment's last word is the key for the next quoted value.
+        if i + 1 < len(parts):
+            words = segments[-1].split()
+            if words:
+                pairs.append((words[-1], parts[i + 1] or "NA"))
+
+    return pairs
 
 
 def to_rows(anno: pd.Series, *, ignore_bad: bool = False) -> pd.DataFrame:
@@ -477,7 +493,7 @@ def to_rows_keep_duplicates(anno: pd.Series, *, ignore_bad: bool = False) -> pd.
 
     Examples
     --------
-    >>> anno = pd.Series(["gene DDX11L1; gene sonic; unique hi"])
+    >>> anno = pd.Series(['gene "DDX11L1"; gene "sonic"; unique "hi"'])
     >>> result = to_rows_keep_duplicates(anno)
     >>> result.to_dict(orient="records")
     [{'gene': 'DDX11L1,sonic', 'unique': 'hi'}]

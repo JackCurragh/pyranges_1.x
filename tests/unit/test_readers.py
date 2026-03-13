@@ -1,4 +1,4 @@
-from pyranges.readers import parse_kv_fields
+from pyranges1.readers import parse_kv_fields
 
 
 def test_parse_kv_fields():
