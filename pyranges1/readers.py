@@ -433,9 +433,16 @@ def read_gtf_full(
     return ensure_pyranges(df)
 
 
-def parse_kv_fields(line: str) -> list[list[str]]:
-    """Parse GTF attribute column."""
-    return [kv.replace('""', '"NA"').replace('"', "").split(None, 1) for kv in line.rstrip("; ").split("; ")]
+def parse_kv_fields(line: str) -> list[tuple[str, str]]:
+    """Parse a GTF attribute field into (key, value) pairs.
+
+    Splits on double-quote characters so semicolons inside quoted values are
+    handled correctly without a character-by-character scan.
+    """
+    parts = line.split('"')
+    keys = [p.split()[-1] for p in parts[::2] if p.strip()]
+    values = [v or "NA" for v in parts[1::2]]
+    return list(zip(keys, values))
 
 
 def to_rows(anno: pd.Series, *, ignore_bad: bool = False) -> pd.DataFrame:
